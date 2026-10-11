@@ -5,3 +5,7 @@ google-auth-httplib2>=0.2,<1
 google-auth-oauthlib>=1.2,<2
 langchain>=1,<2
 langchain-groq>=1,<2
+cryptography>=42,<46
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+psycopg[binary]>=3.2,<4

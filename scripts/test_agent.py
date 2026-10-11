@@ -1,9 +1,5 @@
-from app.email_agent import summarize_emails
-
+"""Smoke test for general chat; does not access Gmail."""
+from app.email_agent import ask_mailpilot
 
 if __name__ == "__main__":
-    print("Generating your recent-email briefing...\n")
-
-    summary = summarize_emails("recent")
-
-    print(summary)
+    print(ask_mailpilot("What is an AI agent?"))

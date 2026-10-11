@@ -1,26 +1,20 @@
+"""Manual Gmail integration test for a previously connected Telegram user.
+
+Set TEST_TELEGRAM_USER_ID in the environment to the numeric Telegram user ID
+that has connected Gmail via /connect.
+"""
+import os
 from app.gmail_service import get_recent_emails
 
-
-def main():
-    print("Connecting to Gmail...")
-
-    emails = get_recent_emails(max_results=5)
-
-    if not emails:
-        print("No matching emails found in the last 7 days.")
-        return
-
-    print(f"\nSuccessfully fetched {len(emails)} emails.\n")
-
-    for number, email in enumerate(emails, start=1):
-        print(f"Email {number}")
-        print(f"From: {email['sender']}")
-        print(f"Subject: {email['subject']}")
-        print(f"Date: {email['date']}")
-        print(f"Unread: {email['unread']}")
-        print(f"Body characters retrieved: {len(email['body'])}")
-        print("-" * 50)
-
-
 if __name__ == "__main__":
-    main()
+    raw_id = os.getenv("TEST_TELEGRAM_USER_ID", "").strip()
+    if not raw_id.isdigit():
+        raise SystemExit("Set TEST_TELEGRAM_USER_ID to a connected Telegram user's numeric ID.")
+    emails = get_recent_emails(
+        max_results=5,
+        query="in:inbox newer_than:7d",
+        telegram_user_id=int(raw_id),
+    )
+    print(f"Retrieved {len(emails)} messages.")
+    for item in emails:
+        print(f"From: {item['sender']} | Subject: {item['subject']} | Unread: {item['unread']}")
