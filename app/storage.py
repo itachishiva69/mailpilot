@@ -53,6 +53,9 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_oauth_states_created_at ON oauth_states(created_at)"
         )
+        conn.execute(
+            "ALTER TABLE oauth_states ADD COLUMN IF NOT EXISTS code_verifier TEXT"
+        )
 
 
 def _fernet() -> Fernet:
@@ -82,18 +85,38 @@ def create_oauth_state(telegram_user_id: int) -> str:
     return state
 
 
-def consume_oauth_state(state: str, max_age_seconds: int = 600) -> int | None:
-    """Consume OAuth state once and return its associated Telegram user ID."""
+def save_oauth_code_verifier(state: str, code_verifier: str) -> None:
+    """Persist the PKCE verifier for this one-time OAuth state."""
+    if not code_verifier:
+        raise ValueError("OAuth code verifier cannot be empty.")
+    with _connect() as conn:
+        cursor = conn.execute(
+            "UPDATE oauth_states SET code_verifier = %s WHERE state = %s",
+            (code_verifier, state),
+        )
+        if cursor.rowcount != 1:
+            raise RuntimeError("Could not save the OAuth code verifier.")
+
+
+def consume_oauth_state(
+    state: str, max_age_seconds: int = 600
+) -> tuple[int, str] | None:
+    """Consume a one-time OAuth state and return its user ID and PKCE verifier."""
     now = time.time()
     with _connect() as conn:
         row = conn.execute(
-            "SELECT telegram_user_id, created_at FROM oauth_states WHERE state = %s FOR UPDATE",
+            "SELECT telegram_user_id, created_at, code_verifier "
+            "FROM oauth_states WHERE state = %s FOR UPDATE",
             (state,),
         ).fetchone()
         conn.execute("DELETE FROM oauth_states WHERE state = %s", (state,))
-        if row is None or now - float(row["created_at"]) > max_age_seconds:
+        if (
+            row is None
+            or now - float(row["created_at"]) > max_age_seconds
+            or not row["code_verifier"]
+        ):
             return None
-        return int(row["telegram_user_id"])
+        return int(row["telegram_user_id"]), str(row["code_verifier"])
 
 
 def save_user_credentials(telegram_user_id: int, email: str, credentials_json: str) -> None:

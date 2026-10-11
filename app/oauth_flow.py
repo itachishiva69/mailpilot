@@ -7,10 +7,20 @@ from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 
 from .config import GMAIL_SCOPES, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, OAUTH_REDIRECT_URI
-from .storage import consume_oauth_state, create_oauth_state, save_user_credentials
+from .storage import (
+    consume_oauth_state,
+    create_oauth_state,
+    save_oauth_code_verifier,
+    save_user_credentials,
+)
 
 
-def _flow(state: str | None = None) -> Flow:
+def _flow(
+    state: str | None = None,
+    *,
+    code_verifier: str | None = None,
+    autogenerate_code_verifier: bool = False,
+) -> Flow:
     missing = [
         name for name, value in (
             ("GOOGLE_CLIENT_ID", GOOGLE_CLIENT_ID),
@@ -34,6 +44,8 @@ def _flow(state: str | None = None) -> Flow:
         client_config,
         scopes=GMAIL_SCOPES,
         state=state,
+        code_verifier=code_verifier,
+        autogenerate_code_verifier=autogenerate_code_verifier,
     )
     flow.redirect_uri = OAUTH_REDIRECT_URI
     return flow
@@ -41,21 +53,26 @@ def _flow(state: str | None = None) -> Flow:
 
 def create_authorization_url(telegram_user_id: int) -> str:
     state = create_oauth_state(telegram_user_id)
-    flow = _flow(state)
+    flow = _flow(state, autogenerate_code_verifier=True)
     url, _ = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
         prompt="consent",
     )
+    verifier = flow.code_verifier
+    if not verifier:
+        raise RuntimeError("Google OAuth did not generate a PKCE verifier.")
+    save_oauth_code_verifier(state, verifier)
     return url
 
 
 def complete_authorization(state: str, code: str) -> tuple[int, str]:
-    telegram_user_id = consume_oauth_state(state)
-    if telegram_user_id is None:
+    pending = consume_oauth_state(state)
+    if pending is None:
         raise ValueError("This authorization link is invalid or expired. Return to Telegram and use /connect again.")
 
-    flow = _flow(state)
+    telegram_user_id, code_verifier = pending
+    flow = _flow(state, code_verifier=code_verifier)
     flow.fetch_token(code=code)
     credentials = flow.credentials
 
