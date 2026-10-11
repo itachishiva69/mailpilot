@@ -1,0 +1,32 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Google OAuth credentials and tokens
+credentials.json
+token.json
+client_secret*.json
+*_credentials*.json
+
+# Python environment
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Backups and logs
+*.bak
+*.log
+
+# Test and tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Editor and operating system files
+.vscode/
+.idea/
+.DS_Store
